@@ -90,16 +90,16 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
         let rowTy = ProvidedTypeDefinition("Row", Some(typeof<obj[]>))
 
         // add one property per Excel field
-        for i in 1 .. headerLine.Columns.Count  do
-            let headerText = ((headerLine.Cells.Item(1,i) :?> Excel.Range).Value2).ToString()
+        for i in 0 .. (headerLine.Columns.Count - 1 ) do
+            let headerText = ((headerLine.Cells.Item(1,i+1) :?> Excel.Range).Value2).ToString()
             
             let valueType = 
                if  forcestring then
                   typeof<string>
                else
-                  if xlApp.WorksheetFunction.IsText(firstLine.Cells.Item(1,i)) then
+                  if xlApp.WorksheetFunction.IsText(firstLine.Cells.Item(1,i+1)) then
                      typeof<string>
-                  elif  xlApp.WorksheetFunction.IsNumber(firstLine.Cells.Item(1,i)) then
+                  elif  xlApp.WorksheetFunction.IsNumber(firstLine.Cells.Item(1,i+1)) then
                      typeof<float>
                   else
                      typeof<string>
