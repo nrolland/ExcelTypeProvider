@@ -10,20 +10,42 @@ open System.IO
 open System
 open Samples.FSharpPreviewRelease2011.ProvidedTypes
 open Microsoft.FSharp.Core.CompilerServices
-open System.Text.RegularExpressions
 open Microsoft.Office.Interop
+open System.Diagnostics
 
-// Simple type wrapping CSV data
-type ExcelFile(filename) =
-    // Cache the sequence of all data lines (all lines but the first)
-    let data = 
-        seq { for line in File.ReadAllLines(filename) |> Seq.skip 1 do
-                yield line.Split(',') |> Array.map float }
-        |> Seq.cache
+// Simple type wrapping Excel data
+type  ExcelFileInternal(filename) =
+    let data  = 
+       let xlApp = new Excel.ApplicationClass()
+       let xlWorkBookInput = xlApp.Workbooks.Open(filename)
+       let xlWorkSheetInput = xlWorkBookInput.Worksheets.["Sheet1"] :?> Excel.Worksheet
+
+       // Cache the sequence of all data lines (all lines but the first)
+       let rows = xlWorkSheetInput.Range(xlWorkSheetInput.Range("A1"), xlWorkSheetInput.Range("A1").End(Excel.XlDirection.xlDown))
+       let rowsseq = seq { for row in rows.Rows do
+                              yield row :?> Excel.Range }
+                     |> Seq.skip 1
+
+       seq { for line in rowsseq do 
+               yield ( seq { for cell in line.Columns do
+                              yield (cell :?> Excel.Range).Value2} 
+                        |> Seq.toArray
+                     )
+            }        
+         |> Seq.cache
     member __.Data = data
 
+type internal ReflectiveBuilder = 
+   static member Cast<'a> (args:obj) =
+      args :?> 'a
+   static member BuildTypedCast lType (args: obj) = 
+         typeof<ReflectiveBuilder>
+            .GetMethod("Cast")
+            .MakeGenericMethod([|lType|])
+            .Invoke(null, [|args|])
+
 [<TypeProvider>]
-type public MiniCsvProvider(cfg:TypeProviderConfig) as this =
+type public ExcelProvider(cfg:TypeProviderConfig) as this =
     inherit TypeProviderForNamespaces()
 
     // Get the assembly and namespace used to house the provided types
@@ -31,13 +53,16 @@ type public MiniCsvProvider(cfg:TypeProviderConfig) as this =
     let ns = "Samples.FSharpPreviewRelease2011.ExcelProvider"
 
     // Create the main provided type
-    let excTy = ProvidedTypeDefinition(asm, ns, "Excel", Some(typeof<obj>))
+    let excTy = ProvidedTypeDefinition(asm, ns, "ExcelFile", Some(typeof<obj>))
 
     // Parameterize the type by the file to use as a template
     let filename = ProvidedStaticParameter("filename", typeof<string>)
-    let forcestring = ProvidedStaticParameter("forcestring", typeof<bool>)
+    let forcestring = ProvidedStaticParameter("forcestring", typeof<bool>, false)
 
-    do excTy.DefineStaticParameters([filename ; forcestring], fun tyName paramValues ->
+    let staticParams = [filename
+                        forcestring]
+
+    do excTy.DefineStaticParameters(staticParams, fun tyName paramValues ->
         let (filename, forcestring) = match paramValues with
                                        | [| :? string  as filename;   :? bool as forcestring |] -> (filename, forcestring)
                                        | [| :? string  as filename|] -> (filename, false)
@@ -52,13 +77,13 @@ type public MiniCsvProvider(cfg:TypeProviderConfig) as this =
         let xlWorkSheetInput = xlWorkBookInput.Worksheets.["Sheet1"] :?> Excel.Worksheet
 
         let headerLine =  xlWorkSheetInput.Range(xlWorkSheetInput.Range("A1"), xlWorkSheetInput.Range("A1").End(Excel.XlDirection.xlToRight))
-        let firstLine  =  xlWorkSheetInput.Range(xlWorkSheetInput.Range("B1"), xlWorkSheetInput.Range("B1").End(Excel.XlDirection.xlToRight))
+        let firstLine  =  xlWorkSheetInput.Range(xlWorkSheetInput.Range("A2"), xlWorkSheetInput.Range("A2").End(Excel.XlDirection.xlToRight))
 
         // define a provided type for each row, erasing to a float[]
-        let rowTy = ProvidedTypeDefinition("Row", Some(typeof<float[]>))
+        let rowTy = ProvidedTypeDefinition("Row", Some(typeof<obj[]>))
 
         // add one property per Excel field
-        for i in 0 .. headerLine.Columns.Count - 1 do
+        for i in 1 .. headerLine.Columns.Count  do
             let headerText = ((headerLine.Cells.Item(1,i) :?> Excel.Range).Value2).ToString()
             
             let valueType = 
@@ -76,24 +101,31 @@ type public MiniCsvProvider(cfg:TypeProviderConfig) as this =
             let fieldName, fieldTy =
                     headerText, valueType
 
-                    //TODO
-            let prop = ProvidedProperty(fieldName, fieldTy, GetterCode = fun [row] -> <@@ (%%row:float[]).[i] @@>)
+            //TODO
+            let prop = 
+               if forcestring then
+                  ProvidedProperty(fieldName, fieldTy, GetterCode = fun [row] -> <@@ ((%%row:obj[]).[i]):?> string  @@>)
+               else
+                  ProvidedProperty(fieldName, fieldTy, GetterCode = fun [row] -> <@@ ReflectiveBuilder.BuildTypedCast fieldTy ((%%row:obj[]).[i])  @@>)
+
 
             // Add metadata defining the property's location in the referenced file
             prop.AddDefinitionLocation(1, i, filename)
             rowTy.AddMember(prop)
                 
         // define the provided type, erasing to excelFile
-        let ty = ProvidedTypeDefinition(asm, ns, tyName, Some(typeof<ExcelFile>))
+        let ty = ProvidedTypeDefinition(asm, ns, tyName, Some(typeof<ExcelFileInternal>))
 
         // add a parameterless constructor which loads the file that was used to define the schema
-        ty.AddMember(ProvidedConstructor([], InvokeCode = fun [] -> <@@ ExcelFile(resolvedFilename) @@>))
+        ty.AddMember(ProvidedConstructor([], InvokeCode = fun [] -> <@@ ExcelFileInternal(resolvedFilename) @@>))
+
+        printf "filename is %A" resolvedFilename
 
         // add a constructor taking the filename to load
-        ty.AddMember(ProvidedConstructor([ProvidedParameter("filename", typeof<string>)], InvokeCode = fun [filename] -> <@@ ExcelFile(%%filename) @@>))
+        ty.AddMember(ProvidedConstructor([ProvidedParameter("filename", typeof<string>)], InvokeCode = fun [filename] -> <@@  ExcelFileInternal(%%filename) @@>))
         
         // add a new, more strongly typed Data property (which uses the existing property at runtime)
-        ty.AddMember(ProvidedProperty("Data", typedefof<seq<_>>.MakeGenericType(rowTy), GetterCode = fun [excFile] -> <@@ (%%excFile:ExcelFile).Data @@>))
+        ty.AddMember(ProvidedProperty("Data", typedefof<seq<_>>.MakeGenericType(rowTy), GetterCode = fun [excFile] -> <@@ (%%excFile:ExcelFileInternal).Data @@>))
 
         // add the row type as a nested type
         ty.AddMember(rowTy)

@@ -7,7 +7,7 @@
     <ProjectGuid>{a33f7ebe-29b0-4656-b9a8-f3a0f762b82c}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Library1</RootNamespace>
-    <AssemblyName>Library1</AssemblyName>
+    <AssemblyName>ExcelTypeProviderTest19</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <Name>ExcelTypeProvider</Name>
   </PropertyGroup>
@@ -31,10 +31,12 @@
     <DocumentationFile>bin\Release\Library1.XML</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Microsoft.Office.Interop.Excel, Version=14.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c" />
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=4.3.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <Private>True</Private>
     </Reference>
+    <Reference Include="office, Version=14.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
@@ -44,6 +46,7 @@
     <Compile Include="ProvidedTypes-0.1.fs" />
     <Compile Include="ExcelTableTypeProvider.fs" />
     <None Include="Script.fsx" />
+    <None Include="BookTest.xls" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
