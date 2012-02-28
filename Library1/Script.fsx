@@ -1,4 +1,4 @@
-﻿#r @".\bin\Debug\ExcelTypeProviderTest24.dll"
+﻿#r @".\bin\Debug\ExcelTypeProviderTest25.dll"
 #r @"Microsoft.Office.Interop.Excel.dll"
 #r @"office.dll"
 
@@ -25,6 +25,7 @@ type ExcelFileInternal(filename) =
                }
                |> Seq.toArray
          xlWorkBookInput.Close()
+         xlApp.Quit()
          res
 
       member __.Data = data
@@ -32,7 +33,12 @@ type ExcelFileInternal(filename) =
 if false then
    let file = ExcelFileInternal(filename)
    printf "%A" file.Data
-else
+elif false then
    let file = Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFileInternal(filename)
    printf "%A" file.Data
+else 
+   let file = new Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFile<"BookTest.xls", true>()
+   printf "\n****Using typeprovider***\n"
+   printf "%A" file.Data
+
 

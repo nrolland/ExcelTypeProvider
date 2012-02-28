@@ -7,7 +7,7 @@
     <ProjectGuid>{a33f7ebe-29b0-4656-b9a8-f3a0f762b82c}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Library1</RootNamespace>
-    <AssemblyName>ExcelTypeProviderTest24</AssemblyName>
+    <AssemblyName>ExcelTypeProviderTest25</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <Name>ExcelTypeProvider</Name>
   </PropertyGroup>

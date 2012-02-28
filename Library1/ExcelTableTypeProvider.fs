@@ -34,6 +34,7 @@ type  ExcelFileInternal(filename) =
                }
                |> Seq.toArray
          xlWorkBookInput.Close()
+         xlApp.Quit()
          res
 
       member __.Data = data
@@ -123,7 +124,7 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
         // add a parameterless constructor which loads the file that was used to define the schema
         ty.AddMember(ProvidedConstructor([], InvokeCode = fun [] -> <@@ ExcelFileInternal(resolvedFilename) @@>))
 
-        printf "filename is %A" resolvedFilename
+        //printf "filename is %A" resolvedFilename
 
         // add a constructor taking the filename to load
         ty.AddMember(ProvidedConstructor([ProvidedParameter("filename", typeof<string>)], InvokeCode = fun [filename] -> <@@  ExcelFileInternal(%%filename) @@>))
