@@ -14,11 +14,11 @@ open Microsoft.Office.Interop
 open System.Diagnostics
 
 // Simple type wrapping Excel data
-type  ExcelFileInternal(filename) =
+type  ExcelFileInternal(filename, sheetname) =
       let data  = 
          let xlApp = new Excel.ApplicationClass()
          let xlWorkBookInput = xlApp.Workbooks.Open(filename)
-         let xlWorkSheetInput = xlWorkBookInput.Worksheets.["Sheet1"] :?> Excel.Worksheet
+         let xlWorkSheetInput = xlWorkBookInput.Worksheets.[sheetname] :?> Excel.Worksheet
 
          // Cache the sequence of all data lines (all lines but the first)
          let firstrow = xlWorkSheetInput.Range(xlWorkSheetInput.Range("A1"), xlWorkSheetInput.Range("A1").End(Excel.XlDirection.xlToRight))
@@ -61,16 +61,19 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
 
     // Parameterize the type by the file to use as a template
     let filename = ProvidedStaticParameter("filename", typeof<string>)
+    let sheetname = ProvidedStaticParameter("sheetname", typeof<string>, "Sheet1")
     let forcestring = ProvidedStaticParameter("forcestring", typeof<bool>, false)
 
     let staticParams = [filename
+                        sheetname  
                         forcestring]
 
     do excTy.DefineStaticParameters(staticParams, fun tyName paramValues ->
-        let (filename, forcestring) = match paramValues with
-                                       | [| :? string  as filename;   :? bool as forcestring |] -> (filename, forcestring)
-                                       | [| :? string  as filename|] -> (filename, false)
-                                       | _ -> ("no file specified to type provider", true)
+        let (filename, sheetname,  forcestring) = match paramValues with
+                                       | [| :? string  as filename;   :? string as sheetname  ;  :? bool as forcestring |] -> (filename, sheetname , forcestring)
+                                       | [| :? string  as filename;   :? bool as forcestring |] -> (filename, "Sheet1",forcestring)
+                                       | [| :? string  as filename|] -> (filename, "Sheet1", false)
+                                       | _ -> ("no file specified to type provider", "",  true)
 
         // [| :? string as filename ,  :? bool  as forcestring |]
         // resolve the filename relative to the resolution folder
@@ -78,7 +81,7 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
         
         let xlApp = new Excel.ApplicationClass()
         let xlWorkBookInput = xlApp.Workbooks.Open(resolvedFilename)
-        let xlWorkSheetInput = xlWorkBookInput.Worksheets.["Sheet1"] :?> Excel.Worksheet
+        let xlWorkSheetInput = xlWorkBookInput.Worksheets.Item(sheetname) :?> Excel.Worksheet
 
         let headerLine =  xlWorkSheetInput.Range(xlWorkSheetInput.Range("A1"), xlWorkSheetInput.Range("A1").End(Excel.XlDirection.xlToRight))
         let firstLine  =  xlWorkSheetInput.Range(xlWorkSheetInput.Range("A2"), xlWorkSheetInput.Range("A2").End(Excel.XlDirection.xlToRight))
@@ -122,7 +125,7 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
         let ty = ProvidedTypeDefinition(asm, ns, tyName, Some(typeof<ExcelFileInternal>))
 
         // add a parameterless constructor which loads the file that was used to define the schema
-        ty.AddMember(ProvidedConstructor([], InvokeCode = fun [] -> <@@ ExcelFileInternal(resolvedFilename) @@>))
+        ty.AddMember(ProvidedConstructor([], InvokeCode = fun [] -> <@@ ExcelFileInternal(resolvedFilename, sheetname) @@>))
 
         //printf "filename is %A" resolvedFilename
 

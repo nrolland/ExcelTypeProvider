@@ -1,4 +1,4 @@
-﻿#r @".\bin\Debug\ExcelTypeProviderTest25.dll"
+﻿#r @".\bin\Debug\ExcelTypeProviderTest28.dll"
 #r @"Microsoft.Office.Interop.Excel.dll"
 #r @"office.dll"
 
@@ -34,11 +34,19 @@ if false then
    let file = ExcelFileInternal(filename)
    printf "%A" file.Data
 elif false then
-   let file = Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFileInternal(filename)
+   let file = Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFileInternal(filename, "Sheet1")
+   printf "%A" file.Data
+elif false then
+   let file = new Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFile<"BookTest.xls", "Sheet1", true>()
+   printf "\n****Using typeprovider***\n"
+   printf "%A" file.Data
+elif true then
+   let file = new Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFile<"BookTestBrokernet.xls", "Brokernet", true>()
+   printf "\n****Using typeprovider with custom sheet name***\n"
    printf "%A" file.Data
 else 
-   let file = new Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFile<"BookTest.xls", true>()
-   printf "\n****Using typeprovider***\n"
+   let file = new Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFile<"BookTestBig.xls", "Sheet1", true>()
+   printf "\n****Using typeprovider with BIG file - actually not so much but it is slow nonetheless... - ***\n"
    printf "%A" file.Data
 
 
