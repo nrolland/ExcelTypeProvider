@@ -1,37 +1,38 @@
-﻿#r @".\bin\Debug\ExcelTypeProviderTest19.dll"
+﻿#r @".\bin\Debug\ExcelTypeProviderTest24.dll"
 #r @"Microsoft.Office.Interop.Excel.dll"
 #r @"office.dll"
 
 open Microsoft.Office.Interop
 
-//let xlApp = new Excel.ApplicationClass()
-//let fullpath = __SOURCE_DIRECTORY__ + "\BookTest.xls"
-//let xlWorkBookInput = xlApp.Workbooks.Open(fullpath)
-//let xlWorkSheetInput = xlWorkBookInput.Worksheets.["Sheet1"] :?> Excel.Worksheet
-//
-//let rows = xlWorkSheetInput.Range(xlWorkSheetInput.Range("A1"), xlWorkSheetInput.Range("A1").End(Excel.XlDirection.xlDown))
-//let rowsseq = seq { for row in rows.Rows do
-//                     yield row :?> Excel.Range }
-//                  |> Seq.skip 1
-//
-//let data =    
-//   seq { for line in rowsseq do 
-//            yield ( seq { for cell in line.Columns do
-//                           yield (cell :?> Excel.Range).Value2 } 
-//                     |> Seq.toList
-//                  )
-//      }        
-//   |> Seq.toList
+let filename  = @"C:\Users\e021230\Documents\Visual Studio 11\Projects\exceltypeprovider\Library1\BookTest.xls"
+type ExcelFileInternal(filename) =
+      let data  = 
+         let xlApp = new Excel.ApplicationClass()
+         let xlWorkBookInput = xlApp.Workbooks.Open(filename)
+         let xlWorkSheetInput = xlWorkBookInput.Worksheets.["Sheet1"] :?> Excel.Worksheet
 
- 
-let file = new Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFile<"BookTest.xls", true>()
+         // Cache the sequence of all data lines (all lines but the first)
+         let firstrow = xlWorkSheetInput.Range(xlWorkSheetInput.Range("A1"), xlWorkSheetInput.Range("A1").End(Excel.XlDirection.xlToRight))
+         let rows = xlWorkSheetInput.Range(firstrow, firstrow.End(Excel.XlDirection.xlDown))
+         let rows_data = seq { for row  in rows.Rows do 
+                                 yield row :?> Excel.Range } |> Seq.skip 1
+         let res = 
+            seq { for line_data in rows_data do 
+                  yield ( seq { for cell in line_data.Columns do
+                                 yield (cell  :?> Excel.Range ).Value2} 
+                           |> Seq.toArray
+                        )
+               }
+               |> Seq.toArray
+         xlWorkBookInput.Close()
+         res
 
-let toto = file.Data |> Seq.head
+      member __.Data = data
 
-let titi = toto.BID
+if false then
+   let file = ExcelFileInternal(filename)
+   printf "%A" file.Data
+else
+   let file = Samples.FSharpPreviewRelease2011.ExcelProvider.ExcelFileInternal(filename)
+   printf "%A" file.Data
 
-//
-//type T = RegexTyped< @"(?<AreaCode>^\d{3})-(?<PhoneNumber>\d{3}-\d{4}$)">
-//let reg = T() 
-//let result = T.IsMatch("425-123-2345")
-//let r = reg.Match("425-123-2345").AreaCode.Value //r equals "425"
