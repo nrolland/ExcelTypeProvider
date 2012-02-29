@@ -89,31 +89,28 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
         // define a provided type for each row, erasing to a float[]
         let rowTy = ProvidedTypeDefinition("Row", Some(typeof<obj[]>))
 
+
         // add one property per Excel field
         for i in 0 .. (headerLine.Columns.Count - 1 ) do
             let headerText = ((headerLine.Cells.Item(1,i+1) :?> Excel.Range).Value2).ToString()
             
-            let valueType = 
+            let valueType, gettercode  = 
                if  forcestring then
-                  typeof<string>
+                     typeof<string>, (fun [row] -> <@@ ((%%row:obj[]).[i]):?> string  @@>)
                else
                   if xlApp.WorksheetFunction.IsText(firstLine.Cells.Item(1,i+1)) then
-                     typeof<string>
+                     typeof<string>, (fun [row] -> <@@ ((%%row:obj[]).[i]):?> string  @@>)
                   elif  xlApp.WorksheetFunction.IsNumber(firstLine.Cells.Item(1,i+1)) then
-                     typeof<float>
+                     typeof<float> , (fun [row] -> <@@ ((%%row:obj[]).[i]):?> float  @@>)
                   else
-                     typeof<string>
+                     typeof<string>, (fun [row] -> <@@ ((%%row:obj[]).[i]):?> string  @@>)
 
             // try to decompose this header into a name and unit
             let fieldName, fieldTy =
                     headerText, valueType
 
-            //TODO
-            let prop = 
-               if forcestring then
-                  ProvidedProperty(fieldName, fieldTy, GetterCode = fun [row] -> <@@ ((%%row:obj[]).[i]):?> string  @@>)
-               else
-                  ProvidedProperty(fieldName, fieldTy, GetterCode = fun [row] -> <@@ ReflectiveBuilder.BuildTypedCast fieldTy ((%%row:obj[]).[i])  @@>)
+            //TODO : test w different types
+            let prop = ProvidedProperty(fieldName, fieldTy, GetterCode = gettercode)
 
 
             // Add metadata defining the property's location in the referenced file
