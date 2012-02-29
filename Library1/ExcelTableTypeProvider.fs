@@ -121,6 +121,7 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
             rowTy.AddMember(prop)
 
         xlWorkBookInput.Close()
+        xlApp.Quit()
         // define the provided type, erasing to excelFile
         let ty = ProvidedTypeDefinition(asm, ns, tyName, Some(typeof<ExcelFileInternal>))
 
