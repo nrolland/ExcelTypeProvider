@@ -13,17 +13,42 @@ open Microsoft.FSharp.Core.CompilerServices
 open Microsoft.Office.Interop
 open System.Diagnostics
 
+module Utils =
+   let ApplyMoveToRange (rg:Excel.Range) (move:Excel.XlDirection) = 
+      rg.Worksheet.Range(rg, rg.End(move))
+
+
 // Simple type wrapping Excel data
-type  ExcelFileInternal(filename, sheetname) =
+type  ExcelFileInternal(filename, sheetorrangename) =
       let data  = 
          let xlApp = new Excel.ApplicationClass()
+         xlApp.Visible <- false
+         xlApp.ScreenUpdating <- false
+         xlApp.DisplayAlerts <- false;
          let xlWorkBookInput = xlApp.Workbooks.Open(filename)
-         let xlWorkSheetInput = xlWorkBookInput.Worksheets.[sheetname] :?> Excel.Worksheet
 
-         // Cache the sequence of all data lines (all lines but the first)
-         let firstrow = xlWorkSheetInput.Range(xlWorkSheetInput.Range("A1"), xlWorkSheetInput.Range("A1").End(Excel.XlDirection.xlToRight))
-         let rows = xlWorkSheetInput.Range(firstrow, firstrow.End(Excel.XlDirection.xlDown))
-         let rows_data = seq { for row  in rows.Rows do 
+
+
+         let mysheets = seq { for  sheet in xlWorkBookInput.Worksheets do yield sheet :?> Excel.Worksheet }
+         let names = seq { for name in xlWorkBookInput.Names do yield name :?> Excel.Name}
+
+         let hasWs =   Seq.exists (fun (ws:Excel.Worksheet) -> (ws.Name = sheetorrangename)) mysheets 
+         let xlRangeInput = if hasWs  then 
+                                 let sheet = Seq.find (fun (ws:Excel.Worksheet) -> (ws.Name = sheetorrangename)) mysheets
+                                 let firstcell = sheet.Cells.Item(1,1) :?> Excel.Range
+                                 Utils.ApplyMoveToRange (Utils.ApplyMoveToRange firstcell Excel.XlDirection.xlToRight) Excel.XlDirection.xlDown
+                            else
+                              let hasName =   Seq.exists (fun (ws:Excel.Name) -> (ws.Name = sheetorrangename)) names 
+                              if hasName then
+                                 (Seq.find (fun (ws:Excel.Name) -> (ws.Name = sheetorrangename)) names ).RefersToRange
+                              else
+                                 failwith (sprintf "Sheet or range %A was not found" sheetorrangename)
+
+
+
+
+
+         let rows_data = seq { for row  in xlRangeInput.Rows do 
                               yield row :?> Excel.Range } |> Seq.skip 1
          let res = 
             seq { for line_data in rows_data do 
@@ -61,16 +86,16 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
 
     // Parameterize the type by the file to use as a template
     let filename = ProvidedStaticParameter("filename", typeof<string>)
-    let sheetname = ProvidedStaticParameter("sheetname", typeof<string>, "Sheet1")
+    let sheetorrangename = ProvidedStaticParameter("sheetname", typeof<string>, "Sheet1")
     let forcestring = ProvidedStaticParameter("forcestring", typeof<bool>, false)
 
     let staticParams = [filename
-                        sheetname  
+                        sheetorrangename   
                         forcestring]
 
     do excTy.DefineStaticParameters(staticParams, fun tyName paramValues ->
-        let (filename, sheetname,  forcestring) = match paramValues with
-                                       | [| :? string  as filename;   :? string as sheetname  ;  :? bool as forcestring |] -> (filename, sheetname , forcestring)
+        let (filename, sheetorrangename ,  forcestring) = match paramValues with
+                                       | [| :? string  as filename;   :? string as sheetorrangename   ;  :? bool as forcestring |] -> (filename, sheetorrangename  , forcestring)
                                        | [| :? string  as filename;   :? bool as forcestring |] -> (filename, "Sheet1",forcestring)
                                        | [| :? string  as filename|] -> (filename, "Sheet1", false)
                                        | _ -> ("no file specified to type provider", "",  true)
@@ -81,10 +106,26 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
         
         let xlApp = new Excel.ApplicationClass()
         let xlWorkBookInput = xlApp.Workbooks.Open(resolvedFilename)
-        let xlWorkSheetInput = xlWorkBookInput.Worksheets.Item(sheetname) :?> Excel.Worksheet
+        let mysheets = seq { for  sheet in xlWorkBookInput.Worksheets do yield sheet :?> Excel.Worksheet }
+        let names = seq { for name in xlWorkBookInput.Names do yield name :?> Excel.Name}
 
-        let headerLine =  xlWorkSheetInput.Range(xlWorkSheetInput.Range("A1"), xlWorkSheetInput.Range("A1").End(Excel.XlDirection.xlToRight))
-        let firstLine  =  xlWorkSheetInput.Range(xlWorkSheetInput.Range("A2"), xlWorkSheetInput.Range("A2").End(Excel.XlDirection.xlToRight))
+
+        let hasWs =   Seq.exists (fun (ws:Excel.Worksheet) -> (ws.Name = sheetorrangename)) mysheets 
+        let xlRangeInput = if hasWs  then 
+                                 let sheet = Seq.find (fun (ws:Excel.Worksheet) -> (ws.Name = sheetorrangename)) mysheets
+                                 let firstcell = sheet.Cells.Item(1,1) :?> Excel.Range
+                                 Utils.ApplyMoveToRange (Utils.ApplyMoveToRange firstcell Excel.XlDirection.xlToRight) Excel.XlDirection.xlDown
+                           else
+                              let hasName =   Seq.exists (fun (ws:Excel.Name) -> (ws.Name = sheetorrangename)) names 
+                              if hasName then
+                                 (Seq.find (fun (ws:Excel.Name) -> (ws.Name = sheetorrangename)) names ).RefersToRange
+                              else
+                                 failwith (sprintf "Sheet or range %A was not found" sheetorrangename)
+
+
+        let lines = seq { for row in xlRangeInput.Rows do yield row } |> Seq.cache
+        let headerLine =  (Seq.head   lines):?> Excel.Range
+        let firstLine  =  (Seq.nth  2 lines):?> Excel.Range
 
         // define a provided type for each row, erasing to a float[]
         let rowTy = ProvidedTypeDefinition("Row", Some(typeof<obj[]>))
@@ -123,7 +164,7 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
         let ty = ProvidedTypeDefinition(asm, ns, tyName, Some(typeof<ExcelFileInternal>))
 
         // add a parameterless constructor which loads the file that was used to define the schema
-        ty.AddMember(ProvidedConstructor([], InvokeCode = fun [] -> <@@ ExcelFileInternal(resolvedFilename, sheetname) @@>))
+        ty.AddMember(ProvidedConstructor([], InvokeCode = fun [] -> <@@ ExcelFileInternal(resolvedFilename, sheetorrangename) @@>))
 
         //printf "filename is %A" resolvedFilename
 
