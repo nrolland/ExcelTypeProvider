@@ -8,7 +8,7 @@ namespace Samples.FSharpPreviewRelease2011.ExcelProvider
 open System.Reflection
 open System.IO
 open System
-open Samples.FSharpPreviewRelease2011.ProvidedTypes
+open Samples.FSharp.ProvidedTypes
 open Microsoft.FSharp.Core.CompilerServices
 open Microsoft.Office.Interop
 open System.Diagnostics
@@ -49,7 +49,7 @@ type  ExcelFileInternal(filename, sheetorrangename) =
 
 
          let rows_data = seq { for row  in xlRangeInput.Rows do 
-                              yield row :?> Excel.Range } |> Seq.skip 1
+                               yield row :?> Excel.Range } |> Seq.skip 1
          let res = 
             seq { for line_data in rows_data do 
                   yield ( seq { for cell in line_data.Columns do
@@ -94,7 +94,8 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
                         forcestring]
 
    do excTy.DefineStaticParameters(staticParams, fun tyName paramValues ->
-      let (filename, sheetorrangename ,  forcestring) = match paramValues with
+      let (filename, sheetorrangename ,  forcestring) = 
+                                    match paramValues with
                                     | [| :? string  as filename;   :? string as sheetorrangename   ;  :? bool as forcestring |] -> (filename, sheetorrangename  , forcestring)
                                     | [| :? string  as filename;   :? bool as forcestring |] -> (filename, "Sheet1",forcestring)
                                     | [| :? string  as filename|] -> (filename, "Sheet1", false)
@@ -140,7 +141,7 @@ type public ExcelProvider(cfg:TypeProviderConfig) as this =
          let headerText = ((headerLine.Cells.Item(1,i+1) :?> Excel.Range).Value2).ToString()
             
          let valueType, gettercode  = 
-            if  forcestring or oFirstdataLine   = None then
+            if  forcestring || oFirstdataLine   = None then
                typeof<string>, (fun [row] -> <@@ ((%%row:obj[]).[i]):?> string  @@>)
             else
                let firstdataLine = oFirstdataLine.Value

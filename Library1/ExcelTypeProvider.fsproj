@@ -7,7 +7,7 @@
     <ProjectGuid>{a33f7ebe-29b0-4656-b9a8-f3a0f762b82c}</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Library1</RootNamespace>
-    <AssemblyName>ExcelTypeProviderTest35</AssemblyName>
+    <AssemblyName>ExcelTypeProvider</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <Name>ExcelTypeProvider</Name>
   </PropertyGroup>
@@ -42,8 +42,8 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ProvidedTypes-0.1.fsi" />
-    <Compile Include="ProvidedTypes-0.1.fs" />
+    <Compile Include="ProvidedTypes-0.2.fsi" />
+    <Compile Include="ProvidedTypes-0.2.fs" />
     <Compile Include="ExcelTableTypeProvider.fs" />
     <None Include="Script.fsx" />
     <None Include="BookTest.xls" />

@@ -1,4 +1,4 @@
-﻿#r @".\bin\Debug\ExcelTypeProviderTest34.dll"
+﻿#r @".\bin\Debug\ExcelTypeProvider.dll"
 #r @"Microsoft.Office.Interop.Excel.dll"
 #r @"office.dll"
 
